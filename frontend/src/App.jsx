@@ -11,6 +11,10 @@ import Perfil from './components/Perfil';
 import AdminPanel from './components/AdminPanel';
 import './App.css';
 
+
+// Definimos la URL base del backend apuntando directamente a Render
+const API_URL = 'https://candykane-backend.onrender.com';
+
 function App() {
   const [productos, setProductos] = useState([]);
   const [cargando, setCargando] = useState(true);
@@ -25,7 +29,7 @@ function App() {
       setUsuarioLogueado(JSON.parse(usuarioGuardado));
     }
 
-    axios.get('http://localhost:3000/api/productos')
+    axios.get(`${API_URL}/api/productos`)
       .then(response => {
         setProductos(response.data);
         setCargando(false);
@@ -84,7 +88,7 @@ function App() {
           volverATienda={() => setVistaActual('home')}
           cerrarSesion={cerrarSesion}
           actualizarCatalogo={async () => {
-            const response = await axios.get('http://localhost:3000/api/productos');
+            const response = await axios.get(`${API_URL}/api/productos`);
             setProductos(response.data);
           }}
         />
