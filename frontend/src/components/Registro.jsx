@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 
-function Registro({ cambiarALogin }) {
+function Registro({ volverATienda, cambiarALogin }) {
   const [nombre, setNombre] = useState('');
   const [correo, setCorreo] = useState('');
   const [contrasena, setContrasena] = useState('');
-  const [telefono, setTelefono] = useState('');
-  const [direccion, setDireccion] = useState('');
+  const [repetirContrasena, setRepetirContrasena] = useState('');
+  const [mostrarPass, setMostrarPass] = useState(false);
+  const [aceptaPoliticas, setAceptaPoliticas] = useState(false);
   const [error, setError] = useState('');
   const [exito, setExito] = useState('');
   const [cargando, setCargando] = useState(false);
@@ -15,6 +16,17 @@ function Registro({ cambiarALogin }) {
     e.preventDefault();
     setError('');
     setExito('');
+
+    if (contrasena !== repetirContrasena) {
+      setError('Las contraseñas no coinciden.');
+      return;
+    }
+
+    if (!aceptaPoliticas) {
+      setError('Debes aceptar la política de privacidad y las condiciones de uso.');
+      return;
+    }
+
     setCargando(true);
 
     try {
@@ -22,123 +34,237 @@ function Registro({ cambiarALogin }) {
         nombre,
         correo,
         contrasena,
-        telefono,
-        direccion
+        telefono: '',
+        direccion: ''
       });
 
       setCargando(false);
-      setExito('¡Registro exitoso! Ya puedes iniciar sesión.');
+      setExito('¡Cuenta creada con éxito! Redirigiendo a iniciar sesión...');
       setTimeout(() => {
         if (cambiarALogin) cambiarALogin();
-      }, 2000);
-
+      }, 1800);
     } catch (err) {
       setCargando(false);
-      setError(err.response?.data?.error || 'Ocurrió un error al registrarse.');
+      setError(err.response?.data?.error || 'Ocurrió un error al crear la cuenta.');
     }
   };
 
   return (
-    <div className="container py-5">
-      <div className="row justify-content-center">
-        <div className="col-md-6">
-          <div className="card border-0 p-4 shadow-sm" style={{ backgroundColor: '#f5efe6' }}>
-            
-            <div className="text-center mb-4">
-              <h3 className="fw-normal" style={{ fontFamily: 'Georgia, serif', color: '#3d2c29' }}>
-                Crear una Cuenta
-              </h3>
-              <p className="text-muted small">Disfruta de la pastelería artesanal en casa</p>
+    <div className="container-fluid p-0 min-vh-100">
+      <div className="row g-0 min-vh-100">
+        
+        {/* COLUMNA IZQUIERDA */}
+        <div 
+          className="col-lg-6 d-none d-lg-flex flex-column justify-content-between p-5 text-white position-relative"
+          style={{
+            backgroundImage: 'linear-gradient(to bottom, rgba(35, 22, 18, 0.45), rgba(35, 22, 18, 0.85)), url("https://images.unsplash.com/photo-1555507036-ab1f4038808a?auto=format&fit=crop&w=1200&q=80")',
+            backgroundSize: 'cover',
+            backgroundPosition: 'center'
+          }}
+        >
+          <div onClick={volverATienda} style={{ cursor: 'pointer' }} className="d-flex align-items-center gap-3">
+            <div 
+              className="rounded-circle border border-light d-flex align-items-center justify-content-center"
+              style={{ width: '42px', height: '42px', fontFamily: 'Georgia, serif', fontSize: '18px' }}
+            >
+              C
+            </div>
+            <div>
+              <h4 className="m-0 fw-normal text-white" style={{ fontFamily: 'Georgia, serif', letterSpacing: '0.5px' }}>
+                CandyKane
+              </h4>
+              <span className="d-block text-uppercase" style={{ fontSize: '8px', letterSpacing: '2.5px', opacity: 0.85 }}>
+                Pastelería Artesanal
+              </span>
+            </div>
+          </div>
+
+          <div className="my-auto pt-5" style={{ maxWidth: '460px' }}>
+            <span className="text-uppercase d-block mb-3" style={{ fontSize: '10px', letterSpacing: '2.5px', color: '#e6ccb2' }}>
+              TU RINCÓN MÁS DULCE
+            </span>
+            <h1 className="display-3 fw-normal mb-4 text-white" style={{ fontFamily: 'Georgia, serif', lineHeight: '1.1' }}>
+              Bienvenida a<br />CandyKane.
+            </h1>
+            <p className="fw-light mb-0" style={{ fontSize: '15px', lineHeight: '1.6', color: '#f0e6dd' }}>
+              Guarda tus favoritos, consulta tus encargos y disfruta de pequeños detalles creados para ti.
+            </p>
+          </div>
+
+          <div>
+            <span className="text-uppercase" style={{ fontSize: '9px', letterSpacing: '2px', opacity: 0.7 }}>
+              HECHO A MANO CADA MAÑANA EN NUESTRO OBRADOR.
+            </span>
+          </div>
+        </div>
+
+        {/* COLUMNA DERECHA */}
+        <div className="col-lg-6 d-flex flex-column justify-content-between p-4 p-md-5" style={{ backgroundColor: '#fbf8f3' }}>
+          
+          <div className="text-end">
+            <button 
+              type="button"
+              onClick={volverATienda} 
+              className="btn btn-link text-decoration-none p-2 text-uppercase"
+              style={{ color: '#8c7a74', fontSize: '11px', letterSpacing: '1.5px', cursor: 'pointer' }}
+            >
+              ← VOLVER A LA PASTELERÍA
+            </button>
+          </div>
+
+          <div className="mx-auto w-100 my-auto py-3" style={{ maxWidth: '440px' }}>
+            <span className="text-uppercase fw-bold d-block mb-2" style={{ color: '#7b3f2e', fontSize: '10px', letterSpacing: '2px' }}>
+              ÁREA PERSONAL
+            </span>
+            <h2 className="display-5 fw-normal mb-2" style={{ fontFamily: 'Georgia, serif', color: '#2b1d1a' }}>
+              Únete a la mesa.
+            </h2>
+            <p className="text-muted small mb-4 pb-1">
+              Crea tu cuenta y deja que guardemos algo especial para ti.
+            </p>
+
+            {/* Pestañas: INICIAR SESIÓN | CREAR CUENTA */}
+            <div className="d-flex mb-4">
+              <button 
+                type="button"
+                onClick={cambiarALogin}
+                className="w-50 bg-transparent border-0 text-uppercase"
+                style={{ 
+                  fontSize: '11px', 
+                  letterSpacing: '1.5px', 
+                  color: '#9e9089',
+                  borderBottom: '1px solid #e2dad0',
+                  paddingBottom: '11px',
+                  cursor: 'pointer'
+                }}
+              >
+                INICIAR SESIÓN
+              </button>
+              <button 
+                type="button"
+                className="w-50 bg-transparent border-0 text-uppercase fw-bold"
+                style={{ 
+                  fontSize: '11px', 
+                  letterSpacing: '1.5px', 
+                  color: '#2b1d1a',
+                  borderBottom: '2px solid #7b3f2e',
+                  paddingBottom: '10px',
+                  cursor: 'pointer'
+                }}
+              >
+                CREAR CUENTA
+              </button>
             </div>
 
-            {error && <div className="alert alert-danger py-2 small">{error}</div>}
-            {exito && <div className="alert alert-success py-2 small">{exito}</div>}
+            {error && <div className="alert alert-danger py-2 small rounded-0 border-0">{error}</div>}
+            {exito && <div className="alert alert-success py-2 small rounded-0 border-0">{exito}</div>}
 
-            <form onSubmit={handleSubmit}>
-              <div className="mb-3">
-                <label className="form-label small text-muted">Nombre completo</label>
+            <form onSubmit={handleSubmit} className="mt-3">
+              <div className="mb-4">
+                <label className="form-label text-uppercase fw-bold mb-1" style={{ fontSize: '10px', letterSpacing: '1.5px', color: '#5a4a44' }}>
+                  NOMBRE
+                </label>
                 <input 
                   type="text" 
-                  className="form-control rounded-0 border-0 p-2 shadow-none" 
-                  style={{ backgroundColor: '#fff' }}
+                  placeholder="¿Cómo te llamas?"
+                  className="form-control bg-transparent border-0 border-bottom rounded-0 px-0 py-2 shadow-none" 
+                  style={{ borderColor: '#d5cbbd', color: '#3d2c29', fontSize: '14px' }}
                   value={nombre}
                   onChange={(e) => setNombre(e.target.value)}
                   required 
                 />
               </div>
 
-              <div className="mb-3">
-                <label className="form-label small text-muted">Correo electrónico</label>
+              <div className="mb-4">
+                <label className="form-label text-uppercase fw-bold mb-1" style={{ fontSize: '10px', letterSpacing: '1.5px', color: '#5a4a44' }}>
+                  CORREO ELECTRÓNICO
+                </label>
                 <input 
                   type="email" 
-                  className="form-control rounded-0 border-0 p-2 shadow-none" 
-                  style={{ backgroundColor: '#fff' }}
+                  placeholder="tu@correo.com"
+                  className="form-control bg-transparent border-0 border-bottom rounded-0 px-0 py-2 shadow-none" 
+                  style={{ borderColor: '#d5cbbd', color: '#3d2c29', fontSize: '14px' }}
                   value={correo}
                   onChange={(e) => setCorreo(e.target.value)}
                   required 
                 />
               </div>
 
-              <div className="mb-3">
-                <label className="form-label small text-muted">Contraseña</label>
+              <div className="mb-4">
+                <label className="form-label text-uppercase fw-bold mb-1" style={{ fontSize: '10px', letterSpacing: '1.5px', color: '#5a4a44' }}>
+                  CONTRASEÑA
+                </label>
+                <div className="position-relative d-flex align-items-center border-bottom" style={{ borderColor: '#d5cbbd' }}>
+                  <input 
+                    type={mostrarPass ? 'text' : 'password'} 
+                    placeholder="Mínimo 8 caracteres"
+                    className="form-control bg-transparent border-0 rounded-0 px-0 py-2 shadow-none" 
+                    style={{ color: '#3d2c29', fontSize: '14px' }}
+                    value={contrasena}
+                    onChange={(e) => setContrasena(e.target.value)}
+                    required 
+                  />
+                  <button 
+                    type="button"
+                    onClick={() => setMostrarPass(!mostrarPass)}
+                    className="btn btn-link text-decoration-none p-0 text-uppercase fw-bold ms-2"
+                    style={{ fontSize: '10px', letterSpacing: '1px', color: '#7b3f2e' }}
+                  >
+                    {mostrarPass ? 'OCULTAR' : 'VER'}
+                  </button>
+                </div>
+              </div>
+
+              <div className="mb-4">
+                <label className="form-label text-uppercase fw-bold mb-1" style={{ fontSize: '10px', letterSpacing: '1.5px', color: '#5a4a44' }}>
+                  REPITE LA CONTRASEÑA
+                </label>
                 <input 
-                  type="password" 
-                  className="form-control rounded-0 border-0 p-2 shadow-none" 
-                  style={{ backgroundColor: '#fff' }}
-                  value={contrasena}
-                  onChange={(e) => setContrasena(e.target.value)}
+                  type={mostrarPass ? 'text' : 'password'} 
+                  placeholder="Repite tu contraseña"
+                  className="form-control bg-transparent border-0 border-bottom rounded-0 px-0 py-2 shadow-none" 
+                  style={{ borderColor: '#d5cbbd', color: '#3d2c29', fontSize: '14px' }}
+                  value={repetirContrasena}
+                  onChange={(e) => setRepetirContrasena(e.target.value)}
                   required 
                 />
               </div>
 
-              <div className="row">
-                <div className="col-md-6 mb-3">
-                  <label className="form-label small text-muted">Teléfono</label>
-                  <input 
-                    type="text" 
-                    className="form-control rounded-0 border-0 p-2 shadow-none" 
-                    style={{ backgroundColor: '#fff' }}
-                    value={telefono}
-                    onChange={(e) => setTelefono(e.target.value)}
-                  />
-                </div>
-                <div className="col-md-6 mb-3">
-                  <label className="form-label small text-muted">Dirección</label>
-                  <input 
-                    type="text" 
-                    className="form-control rounded-0 border-0 p-2 shadow-none" 
-                    style={{ backgroundColor: '#fff' }}
-                    value={direccion}
-                    onChange={(e) => setDireccion(e.target.value)}
-                  />
-                </div>
+              <div className="form-check mb-4">
+                <input 
+                  className="form-check-input rounded-0 shadow-none" 
+                  type="checkbox" 
+                  id="politicasCheck"
+                  checked={aceptaPoliticas}
+                  onChange={(e) => setAceptaPoliticas(e.target.checked)}
+                  style={{ cursor: 'pointer', borderColor: '#b5a89f' }}
+                />
+                <label className="form-check-label small" htmlFor="politicasCheck" style={{ color: '#8c7a74', fontSize: '12px', cursor: 'pointer' }}>
+                  Acepto la política de privacidad y las condiciones de uso.
+                </label>
               </div>
 
               <button 
                 type="submit" 
-                className="btn btn-terracota w-100 py-2 rounded-0 text-uppercase fw-bold mt-2"
-                style={{ fontSize: '13px', letterSpacing: '1px' }}
+                className="btn btn-terracota w-100 py-3 px-4 rounded-0 text-uppercase fw-bold d-flex justify-content-between align-items-center"
+                style={{ fontSize: '11px', letterSpacing: '1.5px' }}
                 disabled={cargando}
               >
-                {cargando ? 'Registrando...' : 'Registrarse'}
+                <span>{cargando ? 'CREANDO CUENTA...' : 'CREAR MI CUENTA'}</span>
+                <span>→</span>
               </button>
             </form>
 
-            <div className="text-center mt-4">
-              <p className="small text-muted mb-0">
-                ¿Ya tienes una cuenta?{' '}
-                <button 
-                  onClick={cambiarALogin} 
-                  className="btn btn-link p-0 text-decoration-underline fw-bold small"
-                  style={{ color: '#7b3f2e' }}
-                >
-                  Inicia sesión
-                </button>
-              </p>
+            <div className="text-center mt-4 pt-1">
+              <span className="small" style={{ color: '#9e9089', fontSize: '12px' }}>
+                ¿Necesitas ayuda? <button type="button" onClick={volverATienda} className="btn btn-link p-0 text-decoration-underline small" style={{ color: '#7b3f2e', fontSize: '12px' }}>Escríbenos</button>
+              </span>
             </div>
-
           </div>
+
+          <div></div>
         </div>
+
       </div>
     </div>
   );
