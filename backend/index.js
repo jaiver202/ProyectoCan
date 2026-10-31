@@ -275,12 +275,9 @@ app.delete('/api/perfil/direcciones/:id', verificarToken, async (req, res) => {
 
 app.post('/api/productos', verificarToken, esAdministrador, async (req, res) => {
     try {
-        const { descripcion, imagen } = req.body;
-        const nombre = typeof req.body.nombre === 'string' ? req.body.nombre.trim() : '';
-        const precio = Number(req.body.precio);
-        const stock = Number(req.body.stock);
+        const { nombre, descripcion, precio, stock, imagen } = req.body;
 
-        if (!nombre || !Number.isFinite(precio) || precio < 0 || !Number.isInteger(stock) || stock < 0) {
+        if (!nombre || precio === undefined || stock === undefined) {
             return res.status(400).json({ error: 'Nombre, precio y stock son obligatorios' });
         }
 
@@ -346,7 +343,9 @@ app.put('/api/productos/:id', verificarToken, esAdministrador, async (req, res) 
         console.error('Error al actualizar producto:', error);
         res.status(500).json({ error: 'Error interno al actualizar el producto' });
     }
-});
+    }
+
+);
 // MÓDULO ADMIN: Resumen del negocio
 app.get('/api/admin/resumen', verificarToken, esAdministrador, async (req, res) => {
     try {
