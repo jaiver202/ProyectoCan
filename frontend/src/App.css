@@ -1,0 +1,124 @@
+:root {
+  --color-fondo: #fbf8f3;
+  --color-texto: #3d2c29;
+  --color-acento: #7b3f2e;
+  --color-secundario: #a46352;
+}
+
+body {
+  background-color: var(--color-fondo) !important;
+  color: var(--color-texto) !important;
+  font-family: 'Georgia', serif; /* Da un toque artesanal y elegante */
+}
+
+/* Estilos personalizados para botones con el color terracota */
+.btn-terracota {
+  background-color: var(--color-acento);
+  color: #fff;
+  border: none;
+  transition: background 0.3s ease;
+}
+
+.btn-terracota:hover {
+  background-color: #5d2f22;
+  color: #fff;
+}
+
+.navbar-layout {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.navbar-content {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: space-between;
+  margin-left: 2rem;
+}
+
+.hero-row {
+  min-height: 620px;
+}
+
+.hero-image {
+  min-height: 550px;
+}
+
+.catalog-product-image {
+  height: 320px;
+}
+
+@media (max-width: 991.98px) {
+  .navbar-content {
+    display: none;
+    flex-basis: 100%;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+    margin-left: 0;
+    padding-top: 1rem;
+  }
+
+  .navbar-content.is-open {
+    display: flex;
+  }
+
+  .navbar-content .navbar-nav {
+    flex-direction: column !important;
+    gap: 0.75rem !important;
+  }
+
+  .navbar-actions {
+    justify-content: flex-start !important;
+    flex-wrap: wrap;
+  }
+
+  .hero-row {
+    min-height: 0;
+  }
+
+  .hero-copy {
+    padding-left: 8% !important;
+    padding-right: 8% !important;
+  }
+
+  .hero-title {
+    font-size: clamp(2.75rem, 8vw, 4rem);
+  }
+
+  .hero-image {
+    min-height: 380px;
+  }
+}
+
+@media (max-width: 575.98px) {
+  .navbar-brand {
+    font-size: 1.35rem !important;
+  }
+
+  .hero-copy {
+    padding-top: 3rem !important;
+    padding-bottom: 3rem !important;
+  }
+
+  .hero-copy .d-flex {
+    align-items: flex-start !important;
+    gap: 1rem !important;
+  }
+
+  .hero-image {
+    min-height: 280px;
+  }
+
+  .catalog-filters {
+    flex-wrap: wrap;
+    gap: 0.75rem 1rem !important;
+  }
+
+  .catalog-product-image {
+    height: clamp(220px, 70vw, 320px);
+  }
+}
