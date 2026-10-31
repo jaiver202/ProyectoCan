@@ -8,6 +8,7 @@ import Footer from './components/Footer';
 import Login from './components/login'; 
 import Registro from './components/Registro';
 import Perfil from './components/Perfil';
+import AdminPanel from './components/AdminPanel';
 import './App.css';
 
 function App() {
@@ -77,6 +78,25 @@ function App() {
         />
       )}
 
+      {vistaActual === 'admin' && usuarioLogueado?.rol === 'admin' && (
+        <AdminPanel
+          usuario={usuarioLogueado}
+          volverATienda={() => setVistaActual('home')}
+          cerrarSesion={cerrarSesion}
+          actualizarCatalogo={async () => {
+            const response = await axios.get('http://localhost:3000/api/productos');
+            setProductos(response.data);
+          }}
+        />
+      )}
+
+      {vistaActual === 'admin' && usuarioLogueado?.rol !== 'admin' && (
+        <div className="container py-5 text-center">
+          <div className="alert alert-danger">No tienes permisos para acceder al panel administrativo.</div>
+          <button type="button" className="btn btn-terracota" onClick={() => setVistaActual('home')}>Volver a la tienda</button>
+        </div>
+      )}
+
       {vistaActual === 'home' && (
         <>
           <Navbar 
@@ -85,6 +105,7 @@ function App() {
             usuarioLogueado={usuarioLogueado}
             cerrarSesion={cerrarSesion}
             irAlPerfil={() => setVistaActual('perfil')}
+            irAlAdmin={() => setVistaActual('admin')}
           />
 
           <Hero />

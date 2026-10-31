@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-function Navbar({ onLoginClick, usuarioLogueado, cerrarSesion, irAlPerfil }) {
+function Navbar({ onLoginClick, usuarioLogueado, cerrarSesion, irAlPerfil, irAlAdmin }) {
   const [menuUsuarioAbierto, setMenuUsuarioAbierto] = useState(false);
 
   return (
@@ -62,7 +62,7 @@ function Navbar({ onLoginClick, usuarioLogueado, cerrarSesion, irAlPerfil }) {
                   <button
                     className="btn btn-terracota btn-sm ps-4 pe-2 rounded-start-pill"
                     type="button"
-                    onClick={irAlPerfil}
+                    onClick={usuarioLogueado.rol === 'admin' ? irAlAdmin : irAlPerfil}
                   >
                     Hola, {usuarioLogueado.nombre}
                   </button>
@@ -87,6 +87,20 @@ function Navbar({ onLoginClick, usuarioLogueado, cerrarSesion, irAlPerfil }) {
                         Mi Perfil
                       </button>
                     </li>
+                    {usuarioLogueado.rol === 'admin' && (
+                      <li>
+                        <button
+                          className="dropdown-item small"
+                          onClick={() => {
+                            setMenuUsuarioAbierto(false);
+                            irAlAdmin();
+                          }}
+                        >
+                          <i className="bi bi-speedometer2 me-2" aria-hidden="true" />
+                          Panel administrativo
+                        </button>
+                      </li>
+                    )}
                     <li><hr className="dropdown-divider" /></li>
                     <li>
                       <button
