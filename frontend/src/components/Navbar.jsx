@@ -1,135 +1,124 @@
-import React, { useState } from 'react';
+import React, { useContext, useState } from 'react';
+import { CartContext } from './CartContext';
 
-function Navbar({ onLoginClick, usuarioLogueado, cerrarSesion, irAlPerfil, irAlAdmin }) {
+function Navbar({ onLoginClick, usuarioLogueado, cerrarSesion, irAlPerfil, irAlAdmin, irAlCarrito }) {
   const [menuUsuarioAbierto, setMenuUsuarioAbierto] = useState(false);
+  const [menuMovilAbierto, setMenuMovilAbierto] = useState(false);
+  const { cart } = useContext(CartContext);
+  const totalItems = cart.reduce((total, item) => total + item.cantidad, 0);
+
+  const cerrarMenuMovil = () => setMenuMovilAbierto(false);
 
   return (
-    <div className="w-100">
-      <div style={{ backgroundColor: '#7b3f2e', color: '#fff', fontSize: '12px', letterSpacing: '1px' }} className="py-2 text-center fw-light w-100">
+    <header className="ck-header">
+      <div className="ck-announcement">
         ENVÍO GRATUITO EN PEDIDOS SUPERIORES A $50.000
       </div>
 
-      <nav className="navbar navbar-expand-lg navbar-light py-3 border-bottom w-100 px-4" style={{ backgroundColor: '#fbf8f3' }}>
-        <div className="container-fluid">
-          
-          <a className="navbar-brand d-flex align-items-center gap-3 text-dark text-start" href="#">
-            <div 
-              className="rounded-circle d-flex align-items-center justify-content-center"
-              style={{ width: '42px', height: '42px', fontFamily: 'Georgia, serif', fontSize: '18px', border: '1px solid #3d2c29', color: '#3d2c29' }}
+      <nav className="ck-navbar" aria-label="Navegación principal">
+        <button
+          type="button"
+          className="ck-menu-toggle"
+          aria-label={menuMovilAbierto ? 'Cerrar menú' : 'Abrir menú'}
+          aria-expanded={menuMovilAbierto}
+          aria-controls="ck-navigation-links"
+          onClick={() => setMenuMovilAbierto((abierto) => !abierto)}
+        >
+          <span />
+          <span />
+          <span />
+        </button>
+
+        <ul
+          id="ck-navigation-links"
+          className={`ck-navigation-links${menuMovilAbierto ? ' is-open' : ''}`}
+        >
+          <li><a href="#nosotros" onClick={cerrarMenuMovil}>Nuestro obrador</a></li>
+          <li><a href="#catalogo" onClick={cerrarMenuMovil}>Colección</a></li>
+          <li><a href="#" onClick={cerrarMenuMovil}>Encargos</a></li>
+          <li><a href="#nosotros" onClick={cerrarMenuMovil}>Visítanos</a></li>
+          <li className="ck-account">
+            <button
+              type="button"
+              aria-expanded={menuUsuarioAbierto}
+              onClick={() => {
+                cerrarMenuMovil();
+                if (!usuarioLogueado) {
+                  onLoginClick();
+                  return;
+                }
+                setMenuUsuarioAbierto((abierto) => !abierto);
+              }}
             >
-              C
-            </div>
-            <div>
-              <h4 className="m-0 fw-normal" style={{ fontFamily: 'Georgia, serif', letterSpacing: '0.5px', color: '#3d2c29' }}>
-                CandyKane
-              </h4>
-              <span className="d-block text-uppercase" style={{ fontSize: '8px', letterSpacing: '2.5px', color: '#7b3f2e' }}>
-                Pastelería Artesanal
-              </span>
-            </div>
-          </a>
+              Mi cuenta
+            </button>
+            {usuarioLogueado && (
+              <ul className={`ck-account-menu${menuUsuarioAbierto ? ' is-open' : ''}`}>
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMenuUsuarioAbierto(false);
+                      irAlPerfil();
+                    }}
+                  >
+                    Mi perfil
+                  </button>
+                </li>
+                {usuarioLogueado.rol === 'admin' && (
+                  <li>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMenuUsuarioAbierto(false);
+                        irAlAdmin();
+                      }}
+                    >
+                      Panel administrativo
+                    </button>
+                  </li>
+                )}
+                <li>
+                  <button
+                    type="button"
+                    className="ck-signout"
+                    onClick={() => {
+                      setMenuUsuarioAbierto(false);
+                      cerrarSesion();
+                    }}
+                  >
+                    Cerrar sesión
+                  </button>
+                </li>
+              </ul>
+            )}
+          </li>
+        </ul>
 
-          <button 
-            className="navbar-toggler border-0 shadow-none" 
-            type="button" 
-            data-bs-toggle="collapse" 
-            data-bs-target="#menuResponsive"
+        <a className="ck-brand" href="#" aria-label="CandyKane, inicio">
+          <span className="ck-brand-mark" aria-hidden="true">C</span>
+          <span className="ck-brand-copy">
+            <span className="ck-brand-name">CandyKane</span>
+            <span className="ck-brand-tagline">Pastelería artesanal</span>
+          </span>
+        </a>
+
+        <button type="button" className="ck-cart-link" onClick={irAlCarrito}>
+          <svg
+            className="ck-cart-icon"
+            viewBox="0 0 24 24"
+            fill="none"
+            aria-hidden="true"
           >
-            <span className="navbar-toggler-icon"></span>
-          </button>
-
-          <div className="collapse navbar-collapse justify-content-between mt-3 mt-lg-0" id="menuResponsive">
-            
-            <ul className="navbar-nav me-auto mb-2 mb-lg-0 gap-lg-4 text-center">
-              <li className="nav-item">
-                <a className="nav-link text-dark" href="#nosotros">Nuestro obrador</a>
-              </li>
-              <li className="nav-item">
-                <a className="nav-link text-dark" href="#catalogo">Colección</a>
-              </li>
-              <li className="nav-item">
-                <a className="nav-link text-dark" href="#">Encargos</a>
-              </li>
-            </ul>
-
-            <div className="d-flex justify-content-center align-items-center gap-3 pb-2 pb-lg-0">
-              <button className="btn btn-outline-dark btn-sm rounded-pill px-3 border-0 bg-transparent">
-                🛒 Cesta <span className="badge rounded-circle bg-dark text-white ms-1">0</span>
-              </button>
-              
-              {usuarioLogueado ? (
-                <div className="dropdown d-flex">
-                  <button
-                    className="btn btn-terracota btn-sm ps-4 pe-2 rounded-start-pill"
-                    type="button"
-                    onClick={usuarioLogueado.rol === 'admin' ? irAlAdmin : irAlPerfil}
-                  >
-                    Hola, {usuarioLogueado.nombre}
-                  </button>
-                  <button
-                    className="btn btn-terracota btn-sm px-3 rounded-end-pill border-start"
-                    type="button"
-                    aria-label="Abrir menú de usuario"
-                    aria-expanded={menuUsuarioAbierto}
-                    onClick={() => setMenuUsuarioAbierto((abierto) => !abierto)}
-                  >
-                    <i className={`bi bi-chevron-${menuUsuarioAbierto ? 'up' : 'down'}`} aria-hidden="true" />
-                  </button>
-                  <ul className={`dropdown-menu dropdown-menu-end border-0 shadow-sm${menuUsuarioAbierto ? ' show' : ''}`} style={{ backgroundColor: '#fbf8f3' }}>
-                    <li>
-                      <button
-                        className="dropdown-item small"
-                        onClick={() => {
-                          setMenuUsuarioAbierto(false);
-                          irAlPerfil();
-                        }}
-                      >
-                        Mi Perfil
-                      </button>
-                    </li>
-                    {usuarioLogueado.rol === 'admin' && (
-                      <li>
-                        <button
-                          className="dropdown-item small"
-                          onClick={() => {
-                            setMenuUsuarioAbierto(false);
-                            irAlAdmin();
-                          }}
-                        >
-                          <i className="bi bi-speedometer2 me-2" aria-hidden="true" />
-                          Panel administrativo
-                        </button>
-                      </li>
-                    )}
-                    <li><hr className="dropdown-divider" /></li>
-                    <li>
-                      <button
-                        className="dropdown-item small text-danger"
-                        onClick={() => {
-                          setMenuUsuarioAbierto(false);
-                          cerrarSesion();
-                        }}
-                      >
-                        Cerrar Sesión
-                      </button>
-                    </li>
-                  </ul>
-                </div>
-              ) : (
-                <button 
-                  className="btn btn-terracota btn-sm px-4 rounded-pill"
-                  onClick={onLoginClick}
-                >
-                  Iniciar Sesión
-                </button>
-              )}
-            </div>
-
-          </div>
-
-        </div>
+            <path d="M7 8V6a5 5 0 0 1 10 0v2M5.5 8h13l1 13h-15l1-13Z" />
+          </svg>
+          <span>Cesta</span>
+          <span className="ck-cart-count" aria-label={`${totalItems} productos`}>
+            {totalItems}
+          </span>
+        </button>
       </nav>
-    </div>
+    </header>
   );
 }
 

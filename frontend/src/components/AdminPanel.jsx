@@ -20,10 +20,10 @@ const formatoMoneda = (valor) => `$${Number(valor || 0).toLocaleString('es-CO')}
 function normalizarEstadoPedido(estado) {
   const normalizado = String(estado || '').toLocaleLowerCase().replaceAll('_', ' ').replaceAll('-', ' ');
   if (normalizado.includes('entreg')) return 'entregado';
-  if (normalizado.includes('prepar')) return 'en preparación';
+  if (normalizado.includes('cancel')) return 'cancelado';
+  if (normalizado.includes('prepar')) return 'en preparacion';
   return 'pendiente';
 }
-
 function AdminPanel({ usuario, volverATienda, cerrarSesion, actualizarCatalogo }) {
   const [seccion, setSeccion] = useState('resumen');
   const [resumen, setResumen] = useState(null);
@@ -422,8 +422,9 @@ function AdminPanel({ usuario, volverATienda, cerrarSesion, actualizarCatalogo }
                                   aria-label={`Estado del pedido ${pedido.id_pedido}`}
                                 >
                                   <option value="pendiente">Pendiente</option>
-                                  <option value="en preparación">En preparación</option>
+                                  <option value="en preparacion">En preparación</option>
                                   <option value="entregado">Entregado</option>
+                                  <option value="cancelado">Cancelado</option>
                                 </select>
                               </td>
                             </tr>
