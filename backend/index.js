@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
 const { verificarToken, esAdministrador } = require('./authMiddleware');
+const { crearControladorPedido } = require('./orderController');
 const pool = require('./db');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
@@ -39,156 +40,70 @@ app.get('/api/productos', async (req, res) => {
 });
 
 // MÓDULO PEDIDOS: Crear un pedido validando y descontando existencias en una transacción
-app.post('/api/pedidos', verificarToken, async (req, res) => {
-    const { modalidad_entrega, direccion_entrega, metodo_pago, productos } = req.body || {};
-    const modalidadesPermitidas = ['domicilio', 'recogida'];
-    const metodosPagoPermitidos = ['transferencia', 'efectivo'];
-    const direccion = typeof direccion_entrega === 'string' ? direccion_entrega.trim() : '';
+app.post('/api/pedidos', verificarToken, crearControladorPedido(pool));
 
-    if (!modalidadesPermitidas.includes(modalidad_entrega)) {
-        return res.status(400).json({ error: 'Selecciona una modalidad de entrega válida.' });
-    }
-    if (modalidad_entrega === 'domicilio' && (!direccion || direccion.length > 200)) {
-        return res.status(400).json({ error: 'Ingresa una dirección válida de máximo 200 caracteres.' });
-    }
-    if (!metodosPagoPermitidos.includes(metodo_pago)) {
-        return res.status(400).json({ error: 'Selecciona un método de pago válido.' });
-    }
-    if (!Array.isArray(productos) || productos.length === 0 || productos.length > 50) {
-        return res.status(400).json({ error: 'El pedido debe incluir entre 1 y 50 productos.' });
-    }
-
-    const cantidadesPorProducto = new Map();
-    for (const producto of productos) {
-        const idProducto = Number(producto?.id_producto);
-        const cantidad = Number(producto?.cantidad);
-        if (!Number.isSafeInteger(idProducto) || idProducto < 1 ||
-            !Number.isSafeInteger(cantidad) || cantidad < 1 || cantidad > 999) {
-            return res.status(400).json({ error: 'Hay un producto o cantidad inválida en el pedido.' });
-        }
-        const cantidadAcumulada = (cantidadesPorProducto.get(idProducto) || 0) + cantidad;
-        if (cantidadAcumulada > 999) {
-            return res.status(400).json({ error: 'La cantidad total de un producto no puede superar 999.' });
-        }
-        cantidadesPorProducto.set(idProducto, cantidadAcumulada);
-    }
-
-    let conexion;
+// MÓDULO PEDIDOS: Consultar los datos del comprobante del cliente autenticado
+app.get('/api/pedidos/:id/comprobante', verificarToken, async (req, res) => {
     try {
-        conexion = await pool.getConnection();
-        await conexion.beginTransaction();
-
-        const idsProducto = [...cantidadesPorProducto.keys()];
-        const [filasProducto] = await conexion.query(
-            `SELECT id_producto, nombre, precio, stock, activo
-             FROM productos
-             WHERE id_producto IN (${idsProducto.map(() => '?').join(', ')})
-               AND activo = TRUE
-             ORDER BY id_producto
-             FOR UPDATE`,
-            idsProducto
-        );
-        const productosPorId = new Map(
-            filasProducto.map((producto) => [Number(producto.id_producto), producto])
-        );
-
-        const productosPedido = [];
-        let total = 0;
-        for (const [idProducto, cantidad] of cantidadesPorProducto) {
-            const producto = productosPorId.get(idProducto);
-            if (!producto) {
-                await conexion.rollback();
-                return res.status(409).json({ error: 'Uno de los productos ya no está disponible.' });
-            }
-            if (Number(producto.stock) < cantidad) {
-                await conexion.rollback();
-                return res.status(409).json({
-                    error: `Stock insuficiente para ${producto.nombre}. Disponibles: ${Number(producto.stock)}.`
-                });
-            }
-
-            const precio = Number(producto.precio);
-            if (!Number.isFinite(precio) || precio < 0) {
-                throw new Error(`El precio de ${producto.nombre} no es válido.`);
-            }
-            total += Math.round(precio * 100) * cantidad;
-            productosPedido.push({
-                id_producto: idProducto,
-                nombre: producto.nombre,
-                cantidad,
-                precio_unitario: Math.round(precio * 100) / 100
-            });
+        const idPedido = req.params.id;
+        if (!/^[1-9]\d*$/.test(idPedido)) {
+            return res.status(400).json({ error: 'El identificador del pedido no es válido.' });
         }
 
-        total /= 100;
+        const [filas] = await pool.query(`
+            SELECT
+                p.id_pedido,
+                p.fecha_pedido,
+                p.estado,
+                p.total,
+                p.metodo_pago,
+                p.direccion_entrega,
+                u.nombre AS cliente_nombre,
+                u.correo AS cliente_correo,
+                u.telefono AS cliente_telefono,
+                COALESCE(d.id_producto, p.id_producto) AS id_producto,
+                COALESCE(pr.nombre, CONCAT('Producto #', COALESCE(d.id_producto, p.id_producto))) AS producto_nombre,
+                COALESCE(d.cantidad, p.cantidad) AS cantidad,
+                COALESCE(d.precio_unitario, p.precio_unitario) AS precio_unitario,
+                COALESCE(d.subtotal, p.precio_unitario * p.cantidad) AS subtotal
+            FROM pedidos p
+            INNER JOIN usuarios u ON u.id_usuario = p.id_usuario
+            LEFT JOIN detalle_pedido d ON d.id_pedido = p.id_pedido
+            LEFT JOIN productos pr ON pr.id_producto = COALESCE(d.id_producto, p.id_producto)
+            WHERE p.id_pedido = ? AND p.id_usuario = ?
+            ORDER BY COALESCE(d.id_producto, p.id_producto)
+        `, [idPedido, req.usuario.id_usuario]);
 
-        for (const producto of productosPedido) {
-            const [resultadoStock] = await conexion.query(
-                `UPDATE productos
-                 SET stock = stock - ?
-                 WHERE id_producto = ? AND stock >= ? AND activo = TRUE`,
-                [producto.cantidad, producto.id_producto, producto.cantidad]
-            );
-            if (resultadoStock.affectedRows !== 1) {
-                throw Object.assign(new Error('El inventario cambió mientras se procesaba el pedido.'), {
-                    status: 409
-                });
+        if (filas.length === 0) {
+            return res.status(404).json({ error: 'No se encontró el pedido.' });
+        }
+
+        const pedido = filas[0];
+        return res.json({
+            pedido: {
+                id_pedido: Number(pedido.id_pedido),
+                fecha_pedido: pedido.fecha_pedido,
+                estado: pedido.estado,
+                total: Number(pedido.total),
+                metodo_pago: pedido.metodo_pago,
+                direccion_entrega: pedido.direccion_entrega,
+                cliente: {
+                    nombre: pedido.cliente_nombre,
+                    correo: pedido.cliente_correo,
+                    telefono: pedido.cliente_telefono
+                },
+                productos: filas.map((fila) => ({
+                    id_producto: Number(fila.id_producto),
+                    nombre: fila.producto_nombre,
+                    cantidad: Number(fila.cantidad),
+                    precio_unitario: Number(fila.precio_unitario),
+                    subtotal: Number(fila.subtotal)
+                }))
             }
-        }
-
-        const direccionPedido = modalidad_entrega === 'domicilio' ? direccion : 'Recogida en tienda';
-        const productoPrincipal = productosPedido[0];
-
-        const [resultadoPedido] = await conexion.query(
-            `INSERT INTO pedidos
-                (id_usuario, id_producto, cantidad, precio_unitario, total, metodo_pago, direccion_entrega, estado)
-             VALUES (?, ?, ?, ?, ?, ?, ?, 'pendiente')`,
-            [
-                req.usuario.id_usuario,
-                productoPrincipal.id_producto,
-                productoPrincipal.cantidad,
-                productoPrincipal.precio_unitario,
-                total,
-                metodo_pago,
-                direccionPedido
-            ]
-        );
-        const idPedido = resultadoPedido.insertId;
-
-        for (const producto of productosPedido) {
-            await conexion.query(
-                `INSERT INTO detalle_pedido
-                    (id_pedido, id_producto, cantidad, precio_unitario, subtotal)
-                 VALUES (?, ?, ?, ?, ?)`,
-                [
-                    idPedido,
-                    producto.id_producto,
-                    producto.cantidad,
-                    producto.precio_unitario,
-                    Math.round(producto.precio_unitario * producto.cantidad * 100) / 100
-                ]
-            );
-        }
-
-        await conexion.commit();
-        res.status(201).json({
-            mensaje: 'Pedido registrado exitosamente.',
-            pedido: { id_pedido: idPedido, total }
         });
     } catch (error) {
-        if (conexion) {
-            try {
-                await conexion.rollback();
-            } catch (rollbackError) {
-                console.error('Error al revertir el pedido:', rollbackError);
-            }
-        }
-        console.error('Error al registrar el pedido:', error);
-        res.status(error.status || 500).json({
-            error: error.status ? error.message : 'No se pudo registrar el pedido.'
-        });
-    } finally {
-        if (conexion) conexion.release();
+        console.error('Error al consultar el comprobante del pedido:', error);
+        return res.status(500).json({ error: 'No se pudo obtener el comprobante del pedido.' });
     }
 });
 

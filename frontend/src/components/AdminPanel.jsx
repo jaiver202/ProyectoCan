@@ -17,6 +17,153 @@ const secciones = [
 const productoVacio = { nombre: '', descripcion: '', precio: '', stock: '', imagen: '' };
 const formatoMoneda = (valor) => `$${Number(valor || 0).toLocaleString('es-CO')}`;
 
+function generarPdfReporteVentas(jsPDF, datos) {
+  const documento = new jsPDF();
+  const ancho = documento.internal.pageSize.getWidth();
+  const alto = documento.internal.pageSize.getHeight();
+  const margen = 18;
+  const colorMarca = [123, 63, 46];
+  const fechaGeneracion = new Intl.DateTimeFormat('es-CO', {
+    dateStyle: 'long',
+    timeStyle: 'short'
+  }).format(new Date());
+  let y = 52;
+
+  const encabezadoSeccion = (titulo) => {
+    if (y > alto - 35) {
+      documento.addPage();
+      y = 22;
+    }
+    documento.setFont('helvetica', 'bold');
+    documento.setFontSize(12);
+    documento.setTextColor(...colorMarca);
+    documento.text(titulo, margen, y);
+    y += 8;
+  };
+
+  const encabezadoTabla = (columnas) => {
+    documento.setFillColor(247, 241, 235);
+    documento.rect(margen, y - 5, ancho - margen * 2, 10, 'F');
+    documento.setFont('helvetica', 'bold');
+    documento.setFontSize(8);
+    documento.setTextColor(55, 48, 44);
+    columnas.forEach((columna) => {
+      documento.text(columna.texto, columna.x, y + 1, { align: columna.alinear || 'left' });
+    });
+    y += 10;
+    documento.setFont('helvetica', 'normal');
+    documento.setFontSize(9);
+  };
+
+  documento.setFillColor(...colorMarca);
+  documento.rect(0, 0, ancho, 40, 'F');
+  documento.setTextColor(255, 255, 255);
+  documento.setFont('helvetica', 'bold');
+  documento.setFontSize(21);
+  documento.text('CandyKane', margen, 18);
+  documento.setFontSize(12);
+  documento.setFont('helvetica', 'normal');
+  documento.text('REPORTE DE VENTAS', margen, 29);
+  documento.setFontSize(9);
+  documento.text(`Generado: ${fechaGeneracion}`, ancho - margen, 20, { align: 'right' });
+
+  documento.setTextColor(55, 48, 44);
+  documento.setFont('helvetica', 'bold');
+  documento.setFontSize(11);
+  documento.text('Resumen historico', margen, y);
+  y += 9;
+  documento.setFont('helvetica', 'normal');
+  documento.setFontSize(10);
+  documento.text(`Ventas registradas: ${formatoMoneda(datos.ventas)}`, margen, y);
+  documento.text(`Pedidos registrados: ${Number(datos.pedidos || 0).toLocaleString('es-CO')}`, ancho / 2, y);
+  y += 14;
+  documento.setFontSize(8);
+  documento.setTextColor(110, 102, 96);
+  const notaCriterio = documento.splitTextToSize(
+    'Los valores suman los pedidos registrados, incluidos los cancelados; el sistema aun no registra pagos recibidos por separado.',
+    ancho - margen * 2
+  );
+  documento.text(notaCriterio, margen, y);
+  y += notaCriterio.length * 4 + 5;
+
+  encabezadoSeccion('Ventas y pedidos por mes');
+  encabezadoTabla([
+    { texto: 'Mes', x: margen + 2 },
+    { texto: 'Pedidos', x: ancho - margen - 48, alinear: 'right' },
+    { texto: 'Ventas', x: ancho - margen - 2, alinear: 'right' }
+  ]);
+  const meses = Array.isArray(datos.porMes) ? datos.porMes : [];
+  for (const item of meses) {
+    if (y > alto - 25) {
+      documento.addPage();
+      y = 22;
+      encabezadoTabla([
+        { texto: 'Mes', x: margen + 2 },
+        { texto: 'Pedidos', x: ancho - margen - 48, alinear: 'right' },
+        { texto: 'Ventas', x: ancho - margen - 2, alinear: 'right' }
+      ]);
+    }
+    const fechaPeriodo = new Date(`${item.periodo}-02T12:00:00`);
+    const periodo = Number.isNaN(fechaPeriodo.getTime())
+      ? String(item.periodo || 'Periodo desconocido')
+      : new Intl.DateTimeFormat('es-CO', { month: 'long', year: 'numeric' }).format(fechaPeriodo);
+    documento.text(periodo, margen + 2, y);
+    documento.text(Number(item.pedidos || 0).toLocaleString('es-CO'), ancho - margen - 48, y, { align: 'right' });
+    documento.text(formatoMoneda(item.ventas), ancho - margen - 2, y, { align: 'right' });
+    y += 8;
+    documento.setDrawColor(232, 224, 216);
+    documento.line(margen, y - 3, ancho - margen, y - 3);
+  }
+  if (meses.length === 0) {
+    documento.setFont('helvetica', 'italic');
+    documento.text('No hay ventas registradas por mes.', margen + 2, y);
+    y += 10;
+  }
+
+  y += 5;
+  encabezadoSeccion('Pedidos por estado');
+  encabezadoTabla([
+    { texto: 'Estado', x: margen + 2 },
+    { texto: 'Cantidad de pedidos', x: ancho - margen - 2, alinear: 'right' }
+  ]);
+  const estados = Array.isArray(datos.porEstado) ? datos.porEstado : [];
+  for (const item of estados) {
+    if (y > alto - 25) {
+      documento.addPage();
+      y = 22;
+      encabezadoTabla([
+        { texto: 'Estado', x: margen + 2 },
+        { texto: 'Cantidad de pedidos', x: ancho - margen - 2, alinear: 'right' }
+      ]);
+    }
+    documento.text(String(item.estado || 'Sin estado'), margen + 2, y);
+    documento.text(Number(item.cantidad || 0).toLocaleString('es-CO'), ancho - margen - 2, y, { align: 'right' });
+    y += 8;
+    documento.setDrawColor(232, 224, 216);
+    documento.line(margen, y - 3, ancho - margen, y - 3);
+  }
+  if (estados.length === 0) {
+    documento.setFont('helvetica', 'italic');
+    documento.text('No hay pedidos para resumir por estado.', margen + 2, y);
+  }
+
+  const totalPaginas = documento.getNumberOfPages();
+  for (let pagina = 1; pagina <= totalPaginas; pagina += 1) {
+    documento.setPage(pagina);
+    documento.setFont('helvetica', 'normal');
+    documento.setFontSize(8);
+    documento.setTextColor(110, 102, 96);
+    documento.text(
+      'Valores calculados con los pedidos registrados en el sistema.',
+      margen,
+      alto - 12
+    );
+    documento.text(`Pagina ${pagina} de ${totalPaginas}`, ancho - margen, alto - 12, { align: 'right' });
+  }
+
+  return documento;
+}
+
 function normalizarEstadoPedido(estado) {
   const normalizado = String(estado || '').toLocaleLowerCase().replaceAll('_', ' ').replaceAll('-', ' ');
   if (normalizado.includes('entreg')) return 'entregado';
@@ -33,6 +180,7 @@ function AdminPanel({ usuario, volverATienda, cerrarSesion, actualizarCatalogo }
   const [reportes, setReportes] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [procesando, setProcesando] = useState(false);
+  const [generandoReporte, setGenerandoReporte] = useState(false);
   const [error, setError] = useState('');
   const [mensaje, setMensaje] = useState('');
   const [busqueda, setBusqueda] = useState('');
@@ -40,7 +188,6 @@ function AdminPanel({ usuario, volverATienda, cerrarSesion, actualizarCatalogo }
   const [modalProducto, setModalProducto] = useState(false);
   const [productoEditando, setProductoEditando] = useState(null);
   const [formProducto, setFormProducto] = useState(productoVacio);
-
   const cargarDatos = useCallback(async () => {
     setCargando(true);
     setError('');
@@ -165,6 +312,24 @@ function AdminPanel({ usuario, volverATienda, cerrarSesion, actualizarCatalogo }
       setMensaje(`Pedido #${pedido.id_pedido}: estado actualizado.`);
     } catch (err) {
       setError(err.response?.data?.error || 'No se pudo actualizar el estado del pedido.');
+    }
+  };
+
+  const descargarReporteVentas = async () => {
+    limpiarAvisos();
+    setGenerandoReporte(true);
+    try {
+      const { data } = await axios.get(`${API_URL}/reportes`, API_TOKEN());
+      const { jsPDF } = await import('jspdf');
+      generarPdfReporteVentas(jsPDF, data).save(
+        `reporte-ventas-candykane-${new Date().toISOString().slice(0, 10)}.pdf`
+      );
+      setMensaje('Reporte de ventas PDF descargado correctamente.');
+    } catch (err) {
+      console.error('Error al generar el reporte de ventas PDF:', err);
+      setError(err.response?.data?.error || 'No se pudo generar el reporte PDF. Inténtalo nuevamente.');
+    } finally {
+      setGenerandoReporte(false);
     }
   };
 
@@ -461,9 +626,18 @@ function AdminPanel({ usuario, volverATienda, cerrarSesion, actualizarCatalogo }
 
                 {seccion === 'reportes' && reportes && (
                   <>
+                    <div className="d-flex justify-content-end mb-3">
+                      <button type="button" className="btn" style={estiloTerracota} onClick={descargarReporteVentas} disabled={generandoReporte}>
+                        <i className={`bi ${generandoReporte ? 'bi-hourglass-split' : 'bi-file-earmark-pdf'} me-2`} aria-hidden="true" />
+                        {generandoReporte ? 'Generando PDF...' : 'Descargar reporte PDF'}
+                      </button>
+                    </div>
                     <div className="row g-3 mb-4">
                       {tarjetaIndicador('Ventas acumuladas', formatoMoneda(reportes.ventas), 'bi-currency-dollar', 'Según pedidos registrados', 'text-success')}
                       {tarjetaIndicador('Pedidos registrados', reportes.pedidos, 'bi-bag-check', 'Historial completo', 'text-primary')}
+                    </div>
+                    <div className="alert alert-warning small" role="note">
+                      Los totales actuales suman todos los pedidos registrados, incluidos los cancelados. El sistema todavía no separa los pagos efectivamente recibidos.
                     </div>
                     <div className="row g-3">
                       <div className="col-12 col-xl-7">
@@ -545,6 +719,7 @@ function AdminPanel({ usuario, volverATienda, cerrarSesion, actualizarCatalogo }
           </div>
         </div>
       )}
+
     </main>
   );
 }
