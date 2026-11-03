@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import axios from 'axios';
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
@@ -9,11 +9,13 @@ import Login from './components/login';
 import Registro from './components/Registro';
 import Perfil from './components/Perfil';
 import AdminPanel from './components/AdminPanel';
+import CartView from './components/CartView';
 import './App.css';
 
-
 // Definimos la URL base del backend apuntando directamente a Render
-const API_URL = 'https://candykane-backend.onrender.com';
+//const API_URL = 'https://candykane-backend.onrender.com';
+// Volver a apuntar al servidor local de Node.js
+const API_URL = 'http://localhost:3000';
 
 function App() {
   const [productos, setProductos] = useState([]);
@@ -21,7 +23,9 @@ function App() {
   const [error, setError] = useState(null);
 
   const [vistaActual, setVistaActual] = useState('home');
+  const [vistaTrasLogin, setVistaTrasLogin] = useState('home');
   const [usuarioLogueado, setUsuarioLogueado] = useState(null);
+  const cerrarCarrito = useCallback(() => setVistaActual('home'), []);
 
   useEffect(() => {
     const usuarioGuardado = localStorage.getItem('usuario');
@@ -49,7 +53,7 @@ function App() {
   };
 
   return (
-    <div className="w-100 overflow-hidden" style={{ backgroundColor: '#fbf8f3', minHeight: '100vh' }}>
+    <div className="w-100" style={{ backgroundColor: '#fbf8f3', minHeight: '100vh' }}>
       
       {vistaActual === 'login' && (
         <Login 
@@ -57,7 +61,7 @@ function App() {
           cambiarARegistro={() => setVistaActual('registro')}
           alIniciarSesionExitoso={(usuario) => {
             setUsuarioLogueado(usuario);
-            setVistaActual('home');
+            setVistaActual(vistaTrasLogin);
           }}
         />
       )}
@@ -72,7 +76,6 @@ function App() {
       {vistaActual === 'perfil' && (
         <Perfil 
           usuario={usuarioLogueado}
-          productos={productos}
           volverATienda={() => setVistaActual('home')}
           cerrarSesion={cerrarSesion}
           alActualizarUsuario={(usuario) => {
@@ -101,15 +104,19 @@ function App() {
         </div>
       )}
 
-      {vistaActual === 'home' && (
+      {(vistaActual === 'home' || vistaActual === 'carrito') && (
         <>
           <Navbar 
-            onLoginClick={() => setVistaActual('login')} 
+            onLoginClick={() => {
+              setVistaTrasLogin('home');
+              setVistaActual('login');
+            }}
             cambiarVista={setVistaActual}
             usuarioLogueado={usuarioLogueado}
             cerrarSesion={cerrarSesion}
             irAlPerfil={() => setVistaActual('perfil')}
             irAlAdmin={() => setVistaActual('admin')}
+            irAlCarrito={() => setVistaActual('carrito')}
           />
 
           <Hero />
@@ -130,6 +137,17 @@ function App() {
 
           <Footer />
         </>
+      )}
+
+      {vistaActual === 'carrito' && (
+        <CartView
+          usuario={usuarioLogueado}
+          volverATienda={cerrarCarrito}
+          iniciarSesion={() => {
+            setVistaTrasLogin('carrito');
+            setVistaActual('login');
+          }}
+        />
       )}
 
     </div>

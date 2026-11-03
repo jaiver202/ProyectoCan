@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import axios from 'axios';
 
 const API_URL = 'http://localhost:3000/api/perfil';
@@ -7,8 +7,7 @@ const apartados = [
   { id: 'informacion', nombre: 'Mi información', icono: 'bi-person' },
   { id: 'pedidos', nombre: 'Mis pedidos', icono: 'bi-bag' },
   { id: 'seguimiento', nombre: 'Seguimiento', icono: 'bi-truck' },
-  { id: 'direcciones', nombre: 'Mis direcciones', icono: 'bi-geo-alt' },
-  { id: 'favoritos', nombre: 'Favoritos', icono: 'bi-heart' }
+  { id: 'direcciones', nombre: 'Mis direcciones', icono: 'bi-geo-alt' }
 ];
 
 const colorTerracota = '#7b3f2e';
@@ -16,13 +15,21 @@ const estiloTerracota = { backgroundColor: colorTerracota, borderColor: colorTer
 
 function obtenerEstado(estado) {
   const normalizado = String(estado || '').toLowerCase().replaceAll('_', ' ').replaceAll('-', ' ');
-  if (normalizado.includes('entreg')) return { texto: 'Entregado', paso: 3 };
-  if (normalizado.includes('prepar')) return { texto: 'En preparación', paso: 2 };
-  if (normalizado.includes('pend')) return { texto: 'Pendiente', paso: 1 };
-  return { texto: estado || 'Pendiente', paso: 1 };
+  if (normalizado.includes('cancel')) return { texto: 'Cancelado', paso: 0, cancelado: true };
+  if (normalizado.includes('entreg')) return { texto: 'Entregado', paso: 3, cancelado: false };
+  if (normalizado.includes('prepar')) return { texto: 'En preparación', paso: 2, cancelado: false };
+  if (normalizado.includes('pend')) return { texto: 'Pendiente', paso: 1, cancelado: false };
+  return { texto: estado || 'Pendiente', paso: 1, cancelado: false };
 }
 
-function Perfil({ usuario, productos = [], volverATienda, cerrarSesion, alActualizarUsuario }) {
+function claseEstado(estado) {
+  if (estado.cancelado) return 'text-bg-danger';
+  if (estado.paso === 3) return 'text-bg-success';
+  if (estado.paso === 2) return 'text-bg-warning';
+  return 'text-bg-secondary';
+}
+
+function Perfil({ usuario, volverATienda, cerrarSesion, alActualizarUsuario }) {
   const [apartadoActivo, setApartadoActivo] = useState('informacion');
   const [perfil, setPerfil] = useState(null);
   const [cargando, setCargando] = useState(true);
@@ -31,9 +38,8 @@ function Perfil({ usuario, productos = [], volverATienda, cerrarSesion, alActual
   const [mensaje, setMensaje] = useState('');
   const [informacion, setInformacion] = useState({ nombre: '', correo: '', telefono: '' });
   const [direccion, setDireccion] = useState({ alias: '', direccion: '', ciudad: '', referencia: '' });
-  const [productoSeleccionado, setProductoSeleccionado] = useState('');
 
-  const cargarPerfil = async (mostrarCarga = true) => {
+  const cargarPerfil = useCallback(async (mostrarCarga = true) => {
     if (mostrarCarga) setCargando(true);
     setError('');
     try {
@@ -52,11 +58,42 @@ function Perfil({ usuario, productos = [], volverATienda, cerrarSesion, alActual
     } finally {
       if (mostrarCarga) setCargando(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     cargarPerfil();
-  }, []);
+  }, [cargarPerfil]);
+
+  useEffect(() => {
+    if (apartadoActivo !== 'seguimiento') return undefined;
+
+    let cancelado = false;
+    const actualizarPedidos = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const response = await axios.get(API_URL, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (!cancelado) {
+          setPerfil((actual) => actual
+            ? { ...actual, pedidos: response.data.pedidos }
+            : actual);
+        }
+      } catch (err) {
+        if (!cancelado) {
+          setError(err.response?.data?.error || 'No se pudo actualizar el seguimiento de tus pedidos.');
+        }
+      }
+    };
+
+    const intervalo = window.setInterval(actualizarPedidos, 15000);
+    window.addEventListener('focus', actualizarPedidos);
+    return () => {
+      cancelado = true;
+      window.clearInterval(intervalo);
+      window.removeEventListener('focus', actualizarPedidos);
+    };
+  }, [apartadoActivo]);
 
   const limpiarAvisos = () => {
     setError('');
@@ -123,49 +160,7 @@ function Perfil({ usuario, productos = [], volverATienda, cerrarSesion, alActual
     }
   };
 
-  const agregarFavorito = async (evento) => {
-    evento.preventDefault();
-    if (!productoSeleccionado) return;
-    limpiarAvisos();
-    try {
-      await axios.post(`${API_URL}/favoritos`, { id_producto: productoSeleccionado }, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      });
-      const producto = productos.find((item) => String(item.id_producto) === productoSeleccionado);
-      if (producto) {
-        setPerfil((actual) => ({
-          ...actual,
-          favoritos: [producto, ...actual.favoritos.filter(
-            (item) => item.id_producto !== producto.id_producto
-          )]
-        }));
-      }
-      setProductoSeleccionado('');
-      setMensaje('Postre agregado a tus favoritos.');
-    } catch (err) {
-      mostrarError(err, 'No se pudo guardar el postre favorito.');
-    }
-  };
-
-  const eliminarFavorito = async (idProducto) => {
-    limpiarAvisos();
-    try {
-      await axios.delete(`${API_URL}/favoritos/${idProducto}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      });
-      setPerfil((actual) => ({
-        ...actual,
-        favoritos: actual.favoritos.filter((item) => item.id_producto !== idProducto)
-      }));
-      setMensaje('Postre eliminado de tus favoritos.');
-    } catch (err) {
-      mostrarError(err, 'No se pudo eliminar el postre favorito.');
-    }
-  };
-
   const apartadoNombre = apartados.find((apartado) => apartado.id === apartadoActivo)?.nombre;
-  const idsFavoritos = new Set((perfil?.favoritos || []).map((item) => item.id_producto));
-
   return (
     <main className="container-fluid min-vh-100 px-3 px-md-4 px-xl-5 pb-5 text-start" style={{ backgroundColor: '#fbf8f3', color: '#3d2c29' }}>
       <header className="container-xl d-flex align-items-center justify-content-between border-bottom py-3 mb-4 mb-lg-5">
@@ -314,7 +309,7 @@ function Perfil({ usuario, productos = [], volverATienda, cerrarSesion, alActual
                                 })}</span>
                               </div>
                               <div className="col-auto">
-                                <span className={`badge rounded-pill ${estado.paso === 3 ? 'text-bg-success' : estado.paso === 2 ? 'text-bg-warning' : 'text-bg-secondary'}`}>{estado.texto}</span>
+                                <span className={`badge rounded-pill ${claseEstado(estado)}`}>{estado.texto}</span>
                               </div>
                               <strong className="col-12 col-sm-auto text-sm-end small">
                                 ${Number(pedido.total).toLocaleString('es-CO')}
@@ -348,21 +343,39 @@ function Perfil({ usuario, productos = [], volverATienda, cerrarSesion, alActual
                           <article className="card border p-3 p-md-4" key={pedido.id_pedido} style={{ borderColor: '#eee6dc', backgroundColor: '#fffdfa' }}>
                             <div className="d-flex align-items-center justify-content-between gap-3 mb-4">
                               <strong className="small">Pedido #{String(pedido.id_pedido).padStart(5, '0')}</strong>
-                              <span className={`badge rounded-pill ${estado.paso === 3 ? 'text-bg-success' : estado.paso === 2 ? 'text-bg-warning' : 'text-bg-secondary'}`}>{estado.texto}</span>
+                              <span className={`badge rounded-pill ${claseEstado(estado)}`}>{estado.texto}</span>
                             </div>
-                            <div className="row text-center g-0">
-                              {['Pendiente', 'En preparación', 'Entregado'].map((paso, index) => (
-                                <div className={`col position-relative small ${estado.paso >= index + 1 ? 'text-success' : 'text-secondary'}`} key={paso}>
-                                  <span
-                                    className={`rounded-circle border d-inline-flex align-items-center justify-content-center position-relative mb-2 ${estado.paso >= index + 1 ? 'bg-success text-white border-success' : 'bg-white'}`}
-                                    style={{ width: 20, height: 20, zIndex: 1 }}
-                                  >
-                                    {estado.paso > index + 1 && <i className="bi bi-check" aria-hidden="true" />}
-                                  </span>
-                                  <span className="d-block">{paso}</span>
-                                </div>
-                              ))}
-                            </div>
+                            {estado.cancelado ? (
+                              <div className="alert alert-danger d-flex align-items-center gap-2 mb-0 py-2 small" role="status">
+                                <i className="bi bi-x-circle-fill" aria-hidden="true" />
+                                <span>Este pedido fue cancelado y ya no avanzará por las etapas de preparación o entrega.</span>
+                              </div>
+                            ) : (
+                              <div className="row text-center g-0">
+                                {['Pendiente', 'En preparación', 'Entregado'].map((paso, index) => {
+                                  const numeroPaso = index + 1;
+                                  const pasoCompletado = estado.paso >= numeroPaso;
+                                  const pasoActual = estado.paso === numeroPaso;
+
+                                  return (
+                                    <div
+                                      className={`col position-relative small ${estado.paso >= numeroPaso ? 'text-success' : 'text-secondary'}`}
+                                      key={paso}
+                                      aria-current={pasoActual ? 'step' : undefined}
+                                    >
+                                      <span
+                                        className={`rounded-circle border d-inline-flex align-items-center justify-content-center position-relative mb-2 ${estado.paso >= numeroPaso ? 'bg-success text-white border-success' : 'bg-white'}`}
+                                        style={{ width: 20, height: 20, zIndex: 1 }}
+                                      >
+                                        {pasoCompletado && <i className="bi bi-check" aria-hidden="true" />}
+                                        {pasoActual && <span className="visually-hidden">Etapa actual</span>}
+                                      </span>
+                                      <span className="d-block">{paso}</span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
                           </article>
                         );
                       })}
@@ -422,72 +435,6 @@ function Perfil({ usuario, productos = [], volverATienda, cerrarSesion, alActual
                             >
                               <i className="bi bi-trash3" aria-hidden="true" />
                             </button>
-                          </div>
-                        </article>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {apartadoActivo === 'favoritos' && (
-                <div className="card border p-3 p-md-4 p-xl-5 shadow-sm" style={{ borderColor: '#eee6dc', backgroundColor: 'rgba(255,255,255,.8)' }}>
-                  <div className="mb-4">
-                    <h3 className="h4 fw-normal mb-2">Tus pequeños grandes favoritos</h3>
-                    <p className="text-secondary small mb-0">Guarda los postres que te gustaría volver a disfrutar.</p>
-                  </div>
-                  <form className="mb-4" onSubmit={agregarFavorito}>
-                    <label className="form-label small fw-semibold" htmlFor="perfil-producto">Añadir un postre de la vitrina</label>
-                    <div className="d-flex flex-column flex-sm-row gap-2">
-                      <select
-                        className="form-select"
-                        id="perfil-producto"
-                        value={productoSeleccionado}
-                        onChange={(evento) => setProductoSeleccionado(evento.target.value)}
-                        required
-                      >
-                        <option value="">Elige un postre</option>
-                        {productos.filter((producto) => !idsFavoritos.has(producto.id_producto)).map((producto) => (
-                          <option key={producto.id_producto} value={producto.id_producto}>{producto.nombre}</option>
-                        ))}
-                      </select>
-                      <button className="btn px-4 flex-shrink-0" style={estiloTerracota} type="submit" disabled={!productoSeleccionado}>
-                        <i className="bi bi-heart" aria-hidden="true" /> Añadir
-                      </button>
-                    </div>
-                  </form>
-                  {perfil.favoritos.length === 0 ? (
-                    <div className="text-center py-4">
-                      <i className="bi bi-heart fs-2 d-block mb-3" aria-hidden="true" style={{ color: '#b7856b' }} />
-                      <h3 className="h5 fw-normal">Tu lista está esperando algo rico</h3>
-                      <p className="text-secondary small mb-0">Elige un postre arriba para guardarlo en tus favoritos.</p>
-                    </div>
-                  ) : (
-                    <div className="row row-cols-1 row-cols-sm-2 row-cols-xl-3 g-3">
-                      {perfil.favoritos.map((producto) => (
-                        <article className="col" key={producto.id_producto}>
-                          <div className="card h-100 border overflow-hidden" style={{ borderColor: '#eee6dc', backgroundColor: '#fffdfa' }}>
-                          <img
-                            src={producto.imagen || 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=600&q=80'}
-                            alt={producto.nombre}
-                            className="card-img-top object-fit-cover"
-                            style={{ height: 155 }}
-                          />
-                          <div className="card-body d-flex align-items-center justify-content-between gap-2 p-3">
-                            <div>
-                              <strong className="d-block small">{producto.nombre}</strong>
-                              <span className="small" style={{ color: '#8d7161' }}>${Number(producto.precio).toLocaleString('es-CO')}</span>
-                            </div>
-                            <button
-                              type="button"
-                              className="btn btn-link p-1"
-                              style={{ color: '#a45b4b' }}
-                              aria-label={`Quitar ${producto.nombre} de favoritos`}
-                              onClick={() => eliminarFavorito(producto.id_producto)}
-                            >
-                              <i className="bi bi-heart-fill" aria-hidden="true" />
-                            </button>
-                          </div>
                           </div>
                         </article>
                       ))}
