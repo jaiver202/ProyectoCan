@@ -9,9 +9,137 @@ function formatPrice(value) {
   return `$${Number(value).toLocaleString('es-CO')}`;
 }
 
+function generarPdfComprobante(jsPDF, pedido) {
+  const documento = new jsPDF();
+  const anchoPagina = documento.internal.pageSize.getWidth();
+  const altoPagina = documento.internal.pageSize.getHeight();
+  const margen = 18;
+  const colorMarca = [123, 63, 46];
+  const formatoFecha = new Intl.DateTimeFormat('es-CO', {
+    dateStyle: 'long',
+    timeStyle: 'short'
+  });
+  const fecha = new Date(pedido.fecha_pedido);
+
+  documento.setFillColor(...colorMarca);
+  documento.rect(0, 0, anchoPagina, 42, 'F');
+  documento.setTextColor(255, 255, 255);
+  documento.setFont('helvetica', 'bold');
+  documento.setFontSize(22);
+  documento.text('CandyKane', margen, 19);
+  documento.setFontSize(11);
+  documento.setFont('helvetica', 'normal');
+  documento.text('COMPROBANTE DE PEDIDO', margen, 30);
+  documento.setFontSize(9);
+  documento.text(`Pedido #${String(pedido.id_pedido).padStart(5, '0')}`, anchoPagina - margen, 19, { align: 'right' });
+  documento.text(
+    Number.isNaN(fecha.getTime()) ? '' : formatoFecha.format(fecha),
+    anchoPagina - margen,
+    30,
+    { align: 'right' }
+  );
+
+  let y = 55;
+  documento.setTextColor(45, 39, 36);
+  documento.setFont('helvetica', 'bold');
+  documento.setFontSize(11);
+  documento.text('Datos del cliente', margen, y);
+  y += 7;
+  documento.setFont('helvetica', 'normal');
+  documento.setFontSize(9);
+  const escribirLinea = (texto) => {
+    const lineas = documento.splitTextToSize(texto, anchoPagina - margen * 2);
+    documento.text(lineas, margen, y);
+    y += lineas.length * 5;
+  };
+  escribirLinea(`Nombre: ${pedido.cliente.nombre || '-'}`);
+  escribirLinea(`Correo: ${pedido.cliente.correo || '-'}`);
+  escribirLinea(`Telefono: ${pedido.cliente.telefono || '-'}`);
+  y += 5;
+
+  documento.setFont('helvetica', 'bold');
+  documento.setFontSize(11);
+  documento.text('Entrega y pago', margen, y);
+  y += 7;
+  documento.setFont('helvetica', 'normal');
+  documento.setFontSize(9);
+  const modalidad = pedido.direccion_entrega === 'Recogida en tienda'
+    ? 'Recogida en tienda'
+    : 'Entrega a domicilio';
+  documento.text(`Modalidad: ${modalidad}`, margen, y);
+  y += 5;
+  if (pedido.direccion_entrega !== 'Recogida en tienda') {
+    const direccion = documento.splitTextToSize(
+      `Direccion: ${pedido.direccion_entrega || '-'}`,
+      anchoPagina - margen * 2
+    );
+    documento.text(direccion, margen, y);
+    y += direccion.length * 5;
+  }
+  documento.text(`Metodo de pago: ${pedido.metodo_pago || '-'}`, margen, y);
+  y += 5;
+  documento.text(`Estado del pedido: ${pedido.estado || '-'}`, margen, y);
+  y += 10;
+
+  const dibujarEncabezadoTabla = () => {
+    documento.setFillColor(247, 241, 235);
+    documento.rect(margen, y - 5, anchoPagina - margen * 2, 10, 'F');
+    documento.setFont('helvetica', 'bold');
+    documento.setFontSize(8);
+    documento.text('Producto', margen + 2, y + 1);
+    documento.text('Cant.', 104, y + 1, { align: 'center' });
+    documento.text('Precio unit.', 147, y + 1, { align: 'right' });
+    documento.text('Subtotal', anchoPagina - margen - 2, y + 1, { align: 'right' });
+    y += 11;
+    documento.setFont('helvetica', 'normal');
+    documento.setFontSize(8);
+  };
+
+  dibujarEncabezadoTabla();
+  for (const producto of pedido.productos) {
+    const nombre = documento.splitTextToSize(producto.nombre || 'Producto', 78);
+    const altoFila = Math.max(8, nombre.length * 4.5);
+    if (y + altoFila > altoPagina - 35) {
+      documento.addPage();
+      y = 20;
+      dibujarEncabezadoTabla();
+    }
+
+    documento.text(nombre, margen + 2, y);
+    documento.text(String(producto.cantidad), 104, y, { align: 'center' });
+    documento.text(formatPrice(producto.precio_unitario), 147, y, { align: 'right' });
+    documento.text(formatPrice(producto.subtotal), anchoPagina - margen - 2, y, { align: 'right' });
+    y += altoFila;
+    documento.setDrawColor(232, 224, 216);
+    documento.line(margen, y - 2, anchoPagina - margen, y - 2);
+  }
+
+  if (y + 22 > altoPagina - 20) {
+    documento.addPage();
+    y = 22;
+  }
+  y += 5;
+  documento.setFont('helvetica', 'bold');
+  documento.setFontSize(12);
+  documento.setTextColor(...colorMarca);
+  documento.text(`TOTAL: ${formatPrice(pedido.total)}`, anchoPagina - margen, y, { align: 'right' });
+
+  documento.setFont('helvetica', 'normal');
+  documento.setFontSize(8);
+  documento.setTextColor(110, 102, 96);
+  documento.text(
+    'Comprobante informativo de compra. No es una factura electronica ni un documento fiscal.',
+    margen,
+    altoPagina - 12
+  );
+
+  return documento;
+}
+
 function CartView({ usuario, volverATienda, iniciarSesion }) {
   const { cart, updateQuantity, removeFromCart, clearCart } = useContext(CartContext);
   const [procesandoCompra, setProcesandoCompra] = useState(false);
+  const [generandoComprobante, setGenerandoComprobante] = useState(false);
   const [validandoRevision, setValidandoRevision] = useState(false);
   const panelRef = useRef(null);
   const compraActivaRef = useRef(false);
@@ -159,6 +287,31 @@ function CartView({ usuario, volverATienda, iniciarSesion }) {
     }
   };
 
+  const descargarComprobante = async () => {
+    const token = localStorage.getItem('token');
+    if (!pedidoConfirmado?.id_pedido || !token) {
+      setErrorCheckout('Inicia sesión nuevamente para descargar el comprobante.');
+      return;
+    }
+
+    setErrorCheckout('');
+    setGenerandoComprobante(true);
+    try {
+      const { data } = await axios.get(
+        `${API_URL}/api/pedidos/${pedidoConfirmado.id_pedido}/comprobante`,
+        { headers: { Authorization: 'Bearer '.concat(token) } }
+      );
+      const { jsPDF } = await import('jspdf');
+      const documento = generarPdfComprobante(jsPDF, data.pedido);
+      documento.save(`comprobante-pedido-${String(pedidoConfirmado.id_pedido).padStart(5, '0')}.pdf`);
+    } catch (error) {
+      console.error('Error al generar el comprobante del pedido:', error);
+      setErrorCheckout(error.response?.data?.error || 'No se pudo generar el comprobante. Inténtalo nuevamente.');
+    } finally {
+      setGenerandoComprobante(false);
+    }
+  };
+
   return (
     <div className="cart-overlay">
       <button
@@ -209,6 +362,11 @@ function CartView({ usuario, volverATienda, iniciarSesion }) {
             <p className="cart-confirmation-note">
               Te contactaremos para coordinar el pago y {modalidadEntrega === 'recogida' ? 'la recogida' : 'la entrega'}.
             </p>
+            {errorCheckout && <p className="checkout-error" role="alert">{errorCheckout}</p>}
+            <button type="button" className="cart-checkout-button" onClick={descargarComprobante} disabled={generandoComprobante}>
+              <span>{generandoComprobante ? 'Generando comprobante...' : 'Descargar comprobante PDF'}</span>
+              <span aria-hidden="true"><i className="bi bi-file-earmark-pdf" /></span>
+            </button>
             <button type="button" className="cart-continue-button" onClick={volverATienda}>
               Seguir comprando
             </button>
@@ -265,7 +423,7 @@ function CartView({ usuario, volverATienda, iniciarSesion }) {
                     <span>Dirección de entrega</span>
                     <textarea
                       rows="2"
-                      maxLength="500"
+                      maxLength="200"
                       required
                       value={direccionEntrega}
                       disabled={procesandoCompra || validandoRevision}
